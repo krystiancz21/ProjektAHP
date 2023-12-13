@@ -3,9 +3,40 @@ from tkinter import ttk, Menu, StringVar
 from tkinter import Canvas
 from itertools import combinations
 import ahpy_swd as ahpy
+import json
+# from tkinter import BOTH, YES
+from tkinter import filedialog
 
 scrollable_frame3 = None
 scrollable_frame4 = None
+
+def load_data():
+    filename = filedialog.askopenfilename(initialdir="/", title="Wybierz plik",
+                                          filetypes=(("Pliki JSON", "*.json"), ("Wszystkie pliki", "*.*")))
+    if filename:
+        with open(filename, 'r') as file:
+            data = json.load(file)
+            # Jeśli dane są listą słowników
+            if isinstance(data, list):
+                for dict_item in data:
+                    for key, value in dict_item.items():
+                        ttk.Label(frame5, text=f"{key}: {value}").pack()
+            # Jeśli dane są pojedynczym słownikiem
+            elif isinstance(data, dict):
+                for key, value in data.items():
+                    ttk.Label(frame5, text=f"{key}: {value}").pack()
+
+# def load_data():
+#     filename = filedialog.askopenfilename(initialdir="/", title="Wybierz plik",
+#                                           filetypes=(("Pliki JSON", "*.json"), ("Wszystkie pliki", "*.*")))
+#     if filename:
+#         with open(filename, 'r') as file:
+#             data = json.load(file)
+#             # Tutaj możesz zrobić coś z danymi, np. wyświetlić je na ekranie
+#             # Wyświetl zawartość pliku JSON
+#             for key, value in data.items():
+#                 ttk.Label(frame5, text=f"{key}: {value}").pack()
+
 
 def get_variants_count(frame):
     mb = ttk.Menubutton(frame, text='Liczba wariantów', style='info.Outline.TMenubutton')
@@ -128,6 +159,8 @@ def submit(variants_cnt, variant_combinations, comparison_data, slider_values, c
 
     variants_count = variants_cnt
     ahp_weights = []
+    all_results = []
+
 
     for j in range(criteria_count):
         matrix = [[1] * variants_count for _ in range(variants_count)]
@@ -162,6 +195,16 @@ def submit(variants_cnt, variant_combinations, comparison_data, slider_values, c
         sorted_dict = dict(sorted_weights)
         ahp_weights.append(sorted_dict)
 
+        results = {
+            "Kryterium": criteria[j],
+            "Wektor wag": str(ahp.target_weights),
+            "CR": str(ahp.consistency_ratio),
+            "CI": str(ahp.consistency_index.real),
+            "Macierz wyborów": [str(row) for row in matrix]
+        }
+        all_results.append(results)
+        
+
         # Dodaj etykiety z wynikami
         ttk.Label(scrollable_frame3, text=f"Kryterium: {criteria[j]}").pack()
         ttk.Label(scrollable_frame3, text="Wektor wag: " + str(ahp.target_weights)).pack()
@@ -171,6 +214,10 @@ def submit(variants_cnt, variant_combinations, comparison_data, slider_values, c
         for row in matrix:
             ttk.Label(scrollable_frame3, text=str(row)).pack()
 
+
+    # Zapisywanie do pliku JSON
+    # with open('results.json', 'w') as json_file:
+    #     json.dump(all_results, json_file, ensure_ascii=False, indent=4)
 
     # print(ahp_weights)
     sum_dict = {key: 0 for key in ahp_weights[0]}
@@ -193,9 +240,17 @@ def submit(variants_cnt, variant_combinations, comparison_data, slider_values, c
     # Dodaj tytuł do karty frame4
     title_label = ttk.Label(scrollable_frame4, text="Najbardziej pożądane warianty")
     title_label.pack()
-    for key, value in sorted_average:
+
+    summary_dict = {"Podsumowanie": {}}
+    for index, (key, value) in enumerate(sorted_average, start=1):
         rounded_value = round(value, 3)
-        ttk.Label(scrollable_frame4, text=f"Średnia dla {key}: {rounded_value}").pack()
+        summary_dict["Podsumowanie"][key] = rounded_value
+        ttk.Label(scrollable_frame4, text=f"{index}. Średnia dla {key}: {rounded_value}").pack()
+
+    all_results.append(summary_dict)
+
+    with open('results.json', 'w') as json_file:
+        json.dump(all_results, json_file, ensure_ascii=False, indent=4)
 
     notebook.select(frame3)
 
@@ -235,7 +290,6 @@ input_criteria.grid(row=4, column=0, padx=5, pady=10)
 button2 = ttk.Button(frame1, text="Dodaj kryterium", command=lambda: add_criteria(criteria_cnt))
 button2.grid(row=4, column=1, padx=5, pady=10)
 
-# Utwórz etykietę do wyświetlania wybranych wariantów
 selected_value_label = ttk.Label(frame1, text="")
 selected_value_label.grid(row=2, column=0, columnspan=2, padx=5, pady=10)
 
@@ -243,17 +297,13 @@ criteria_label = ttk.Label(frame1, text="")
 criteria_label.grid(row=5, column=0, columnspan=2, padx=5, pady=10)
 
 ###################
-
-# Utwórz drugą kartę
 frame2 = ttk.Frame(notebook)
 notebook.add(frame2, text='Sliders')
 
-# Utwórz Canvas i pasek przewijania
 canvas = Canvas(frame2)
 scrollbar = ttk.Scrollbar(frame2, orient='vertical', command=canvas.yview)
 scrollable_frame = ttk.Frame(canvas)
 
-# Powiąż pasek przewijania z Canvas
 scrollable_frame.bind(
     "<Configure>",
     lambda e: canvas.configure(
@@ -263,11 +313,9 @@ scrollable_frame.bind(
 canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
 canvas.configure(yscrollcommand=scrollbar.set)
 
-# Utwórz przycisk do aktualizacji slidów
 update_button = ttk.Button(frame2, text="Aktualizuj slidery", command=lambda: update_sliders(option_var, variants,  criteria))
 update_button.pack()
 
-# Upakuj Canvas i pasek przewijania
 canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
 
@@ -275,12 +323,10 @@ scrollbar.pack(side="right", fill="y")
 frame3 = ttk.Frame(notebook)
 notebook.add(frame3, text='Results')
 
-# Utwórz Canvas i pasek przewijania
 canvas_frame3 = Canvas(frame3)
 scrollbar_frame3 = ttk.Scrollbar(frame3, orient='vertical', command=canvas_frame3.yview)
 scrollable_frame3 = ttk.Frame(canvas_frame3)
 
-# Powiąż pasek przewijania z Canvas
 scrollable_frame3.bind(
     "<Configure>",
     lambda e: canvas_frame3.configure(
@@ -290,7 +336,6 @@ scrollable_frame3.bind(
 canvas_frame3.create_window((0, 0), window=scrollable_frame3, anchor="nw")
 canvas_frame3.configure(yscrollcommand=scrollbar_frame3.set)
 
-# Upakuj Canvas i pasek przewijania
 canvas_frame3.pack(side="left", fill="both", expand=True)
 scrollbar_frame3.pack(side="right", fill="y")
 
@@ -298,12 +343,10 @@ scrollbar_frame3.pack(side="right", fill="y")
 frame4 = ttk.Frame(notebook)
 notebook.add(frame4, text='Summary results')
 
-# Utwórz Canvas i pasek przewijania
 canvas_frame4 = Canvas(frame4)
 scrollbar_frame4 = ttk.Scrollbar(frame4, orient='vertical', command=canvas_frame4.yview)
 scrollable_frame4 = ttk.Frame(canvas_frame4)
 
-# Powiąż pasek przewijania z Canvas
 scrollable_frame4.bind(
     "<Configure>",
     lambda e: canvas_frame4.configure(
@@ -313,9 +356,14 @@ scrollable_frame4.bind(
 canvas_frame4.create_window((0, 0), window=scrollable_frame4, anchor="nw")
 canvas_frame4.configure(yscrollcommand=scrollbar_frame4.set)
 
-# Upakuj Canvas i pasek przewijania
 canvas_frame4.pack(side="left", fill="both", expand=True)
 scrollbar_frame4.pack(side="right", fill="y")
 
+###################
+frame5 = ttk.Frame(notebook)
+notebook.add(frame5, text='Load data')
+
+load_button = ttk.Button(frame5, text="Wczytaj dane", command=load_data)
+load_button.pack()
 
 window.mainloop()
