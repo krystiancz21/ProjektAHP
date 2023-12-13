@@ -1,14 +1,11 @@
 from ttkbootstrap import Style
 from tkinter import ttk, Menu, StringVar
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider, Button
-import numpy as np
 from tkinter import Canvas
-import time
 from itertools import combinations
 import ahpy_swd as ahpy
 
-frame3 = None
+scrollable_frame3 = None
+scrollable_frame4 = None
 
 def get_variants_count(frame):
     mb = ttk.Menubutton(frame, text='Liczba wariantów', style='info.Outline.TMenubutton')
@@ -23,7 +20,15 @@ def get_variants_count(frame):
 
 
 def convertValue(val):
-    if val > 80:
+    if val > 160:
+        return 1 / 9
+    elif val > 140:
+        return 1 / 7
+    elif val > 120:
+        return 1 / 5
+    elif val > 100:
+        return 1 / 3
+    elif val > 80:
         return 1
     elif val > 60:
         return 3
@@ -33,7 +38,6 @@ def convertValue(val):
         return 7
     else:
         return 9
-
 
 def get_criteria_count(frame):
     mb = ttk.Menubutton(frame, text='Liczba kryteriów', style='info.Outline.TMenubutton')
@@ -96,7 +100,7 @@ def update_sliders(option_cnt, variant, criteria):
             label = ttk.Label(frame, text=f'{variant_combinations[i][0]} - {variant_combinations[i][1]}')
             label.pack(side="top")
 
-            slider = ttk.Scale(frame, from_=0, to=100, orient='horizontal', value=50, length=250)
+            slider = ttk.Scale(frame, from_=0, to=180, orient='horizontal', value=90, length=250)
             slider.pack(side="left")
 
             slider_values.append(slider)
@@ -104,73 +108,26 @@ def update_sliders(option_cnt, variant, criteria):
             value_label = ttk.Label(frame, text='')
             value_label.pack(side="left")
 
-            # def make_scalerSlider(slider, label):
-            #     def scalerSlider(e):
-            #         label.config(text=f'{int(slider.get())}')
-            #
-            #     return scalerSlider
-
             def make_scalerSlider(slider, label):
                 return lambda e: label.config(text=f'{int(slider.get())}')
 
             slider.config(command=make_scalerSlider(slider, value_label))
 
     button = ttk.Button(scrollable_frame, text="Oblicz",
-                        command=lambda: submit(variants_count, variant_combinations, comparison_data, slider_values, len(criteria)))
+                        command=lambda: submit(variants_count, variant_combinations, comparison_data, slider_values, len(criteria), criteria))
     button.pack()
 
-def update_sliderszzz(option_cnt, variant, criteria):
-    comparison_data = {}
-    slider_values = []
+def submit(variants_cnt, variant_combinations, comparison_data, slider_values, criteria_count, criteria):
+    global scrollable_frame3, scrollable_frame4
 
-    for widget in scrollable_frame.winfo_children():
+    for widget in scrollable_frame3.winfo_children():
         widget.destroy()
 
-    variants_count = int(option_cnt.get())
-    sliders_count = int((variants_count * (variants_count - 1)) / 2)
-
-    variant_combinations = list(combinations(variant, 2))
-
-    for criterion in criteria:
-        ttk.Label(scrollable_frame, text=f'Kryterium: {criterion}').pack()
-
-        for i in range(sliders_count):
-            frame = ttk.Frame(scrollable_frame)
-            frame.pack(side="top", fill="x", padx=5, pady=5)
-
-            label = ttk.Label(frame, text=f'{variant_combinations[i][0]} - {variant_combinations[i][1]}')
-            label.pack(side="top")
-
-            slider = ttk.Scale(frame, from_=0, to=100, orient='horizontal', value=50, length=200)
-            slider.pack(side="left")
-
-            slider_values.append(slider)
-
-            value_label = ttk.Label(frame, text='')
-            value_label.pack(side="left")
-
-            def make_scalerSlider(slider, label):
-                return lambda e: label.config(text=f'{int(slider.get())}')
-
-            # def make_scalerSlider(slider, label):
-            #     def scalerSlider(e):
-            #         label.config(text=f'{int(slider.get())}')
-            #
-            #     return scalerSlider
-
-            slider.config(command=make_scalerSlider(slider, value_label))
-
-    button = ttk.Button(scrollable_frame, text="Oblicz",
-                        command=lambda: submit(variant_combinations, comparison_data, slider_values, len(criteria)))
-    button.pack()
-
-def submit(variants_cnt, variant_combinations, comparison_data, slider_values, criteria_count):
-    global frame3
-
-    for widget in frame3.winfo_children():
+    for widget in scrollable_frame4.winfo_children():
         widget.destroy()
 
     variants_count = variants_cnt
+    ahp_weights = []
 
     for j in range(criteria_count):
         matrix = [[1] * variants_count for _ in range(variants_count)]
@@ -180,7 +137,6 @@ def submit(variants_cnt, variant_combinations, comparison_data, slider_values, c
         matrixLvl = builderVar - 1
 
         for i in range(variants_count * (variants_count - 1) // 2):
-            # value = slider_values[j*variants_count + i].get()
             value = slider_values[j * len(variant_combinations) + i].get()
             if value < 0:
                 value = 1 / -value
@@ -202,116 +158,47 @@ def submit(variants_cnt, variant_combinations, comparison_data, slider_values, c
 
         ahp = ahpy.Compare(name='AHP', comparisons=comparison_data, precision=3, random_index='saaty')
 
+        sorted_weights = sorted(ahp.target_weights.items(), key=lambda x: x[0])
+        sorted_dict = dict(sorted_weights)
+        ahp_weights.append(sorted_dict)
+
         # Dodaj etykiety z wynikami
-        ttk.Label(frame3, text=f"Kryterium {j+1}").pack()
-        ttk.Label(frame3, text="Wektor wag: " + str(ahp.target_weights)).pack()
-        ttk.Label(frame3, text="CR: " + str(ahp.consistency_ratio)).pack()
-        ttk.Label(frame3, text="CI: " + str(ahp.consistency_index.real)).pack()
-        ttk.Label(frame3, text="Macierz wyborów:").pack()
+        ttk.Label(scrollable_frame3, text=f"Kryterium: {criteria[j]}").pack()
+        ttk.Label(scrollable_frame3, text="Wektor wag: " + str(ahp.target_weights)).pack()
+        ttk.Label(scrollable_frame3, text="CR: " + str(ahp.consistency_ratio)).pack()
+        ttk.Label(scrollable_frame3, text="CI: " + str(ahp.consistency_index.real)).pack()
+        ttk.Label(scrollable_frame3, text="Macierz wyborów:").pack()
         for row in matrix:
-            ttk.Label(frame3, text=str(row)).pack()
-
-    # Przełącz na kartę z wynikami
-    notebook.select(frame3)
+            ttk.Label(scrollable_frame3, text=str(row)).pack()
 
 
-def submitnews(variant_combinations, comparison_data, slider_values, criteria_count):
-    global frame3
+    # print(ahp_weights)
+    sum_dict = {key: 0 for key in ahp_weights[0]}
+    count_dict = {key: 0 for key in ahp_weights[0]}
 
-    for widget in frame3.winfo_children():
-        widget.destroy()
-
-    variants_count = len(variant_combinations)
-
-    for j in range(criteria_count):
-        matrix = [[1] * variants_count for _ in range(variants_count)]
-        idx1 = 0
-        idx2 = 0
-        builderVar = variants_count - 1
-        matrixLvl = builderVar - 1
-
-        for i in range(variants_count):
-            value = slider_values[j*variants_count + i].get()
-            if value < 0:
-                value = 1 / -value
-            elif value == 0:
-                value = 1
-            value = convertValue(value)
-            comparison_data[variant_combinations[i]] = value
-
-            if i == builderVar:
-                builderVar += matrixLvl
-                matrixLvl -= 1
-                idx1 += 1
-                idx2 = idx1 + 1
+    for weight_dict in ahp_weights:
+        for key, values in weight_dict.items():
+            # Jeśli wartość to lista, dodaj każdy element do sumy
+            if isinstance(values, list):
+                sum_dict[key] += sum(values)
+                count_dict[key] += len(values)
             else:
-                idx2 += 1
+                sum_dict[key] += values
+                count_dict[key] += 1
 
-            matrix[idx1][idx2] = round(float(value), 2)
-            matrix[idx2][idx1] = round(float(1 / value), 2)
+    average_dict = {key: sum_dict[key] / count_dict[key] for key in sum_dict}
 
-        ahp = ahpy.Compare(name='AHP', comparisons=comparison_data, precision=3, random_index='saaty')
+    sorted_average = sorted(average_dict.items(), key=lambda x: x[1], reverse=True)
 
-        # Dodaj etykiety z wynikami
-        ttk.Label(frame3, text=f"Kryterium {j+1}").pack()
-        ttk.Label(frame3, text="Wektor wag: " + str(ahp.target_weights)).pack()
-        ttk.Label(frame3, text="CR: " + str(ahp.consistency_ratio)).pack()
-        ttk.Label(frame3, text="CI: " + str(ahp.consistency_index.real)).pack()
-        ttk.Label(frame3, text="Macierz wyborów:").pack()
-        for row in matrix:
-            ttk.Label(frame3, text=str(row)).pack()
+    # Dodaj tytuł do karty frame4
+    title_label = ttk.Label(scrollable_frame4, text="Najbardziej pożądane warianty")
+    title_label.pack()
+    for key, value in sorted_average:
+        rounded_value = round(value, 3)
+        ttk.Label(scrollable_frame4, text=f"Średnia dla {key}: {rounded_value}").pack()
 
-    # Przełącz na kartę z wynikami
     notebook.select(frame3)
 
-def submitzzz(variant_combinations, comparison_data, slider_values, criteria_count):
-    global frame3
-
-    for widget in frame3.winfo_children():
-        widget.destroy()
-
-    variants_count = len(variant_combinations)
-
-    for j in range(criteria_count):
-        matrix = [[1] * variants_count for _ in range(variants_count)]
-        idx1 = 0
-        idx2 = 0
-        builderVar = variants_count - 1
-        matrixLvl = builderVar - 1
-
-        for i in range(variants_count):
-            value = slider_values[j*variants_count + i].get()
-            if value < 0:
-                value = 1 / -value
-            elif value == 0:
-                value = 1
-            value = convertValue(value)
-            comparison_data[variant_combinations[i]] = value
-
-            if i == builderVar:
-                builderVar += matrixLvl
-                matrixLvl -= 1
-                idx1 += 1
-                idx2 = idx1 + 1
-            else:
-                idx2 += 1
-
-            matrix[idx1][idx2] = round(float(value), 2)
-            matrix[idx2][idx1] = round(float(1 / value), 2)
-
-        ahp = ahpy.Compare(name='AHP', comparisons=comparison_data, precision=3, random_index='saaty')
-
-        # Dodaj etykiety z wynikami
-        ttk.Label(frame3, text=f"Kryterium {j+1}").pack()
-        ttk.Label(frame3, text="Wektor wag: " + str(ahp.target_weights)).pack()
-        ttk.Label(frame3, text="CR: " + str(ahp.consistency_ratio)).pack()
-        ttk.Label(frame3, text="CI: " + str(ahp.consistency_index.real)).pack()
-        ttk.Label(frame3, text="Macierz wyborów:").pack()
-        for row in matrix:
-            ttk.Label(frame3, text=str(row)).pack()
-
-    # Przełącz na kartę z wynikami
-    notebook.select(frame3)
 
 ###################
 style = Style(theme='superhero')
@@ -377,7 +264,6 @@ canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
 canvas.configure(yscrollcommand=scrollbar.set)
 
 # Utwórz przycisk do aktualizacji slidów
-# update_button = ttk.Button(frame2, text="Aktualizuj slidery", command=update_sliders)
 update_button = ttk.Button(frame2, text="Aktualizuj slidery", command=lambda: update_sliders(option_var, variants,  criteria))
 update_button.pack()
 
@@ -388,199 +274,48 @@ scrollbar.pack(side="right", fill="y")
 ###################
 frame3 = ttk.Frame(notebook)
 notebook.add(frame3, text='Results')
-scrollbar_frame3 = ttk.Scrollbar(frame3, orient='vertical', command=canvas.yview)
-scrollbar_frame3.pack(side="right", fill="y")
 
+# Utwórz Canvas i pasek przewijania
+canvas_frame3 = Canvas(frame3)
+scrollbar_frame3 = ttk.Scrollbar(frame3, orient='vertical', command=canvas_frame3.yview)
+scrollable_frame3 = ttk.Frame(canvas_frame3)
+
+# Powiąż pasek przewijania z Canvas
+scrollable_frame3.bind(
+    "<Configure>",
+    lambda e: canvas_frame3.configure(
+        scrollregion=canvas_frame3.bbox("all")
+    )
+)
+canvas_frame3.create_window((0, 0), window=scrollable_frame3, anchor="nw")
+canvas_frame3.configure(yscrollcommand=scrollbar_frame3.set)
+
+# Upakuj Canvas i pasek przewijania
+canvas_frame3.pack(side="left", fill="both", expand=True)
+scrollbar_frame3.pack(side="right", fill="y")
 
 ###################
 frame4 = ttk.Frame(notebook)
 notebook.add(frame4, text='Summary results')
 
+# Utwórz Canvas i pasek przewijania
+canvas_frame4 = Canvas(frame4)
+scrollbar_frame4 = ttk.Scrollbar(frame4, orient='vertical', command=canvas_frame4.yview)
+scrollable_frame4 = ttk.Frame(canvas_frame4)
+
+# Powiąż pasek przewijania z Canvas
+scrollable_frame4.bind(
+    "<Configure>",
+    lambda e: canvas_frame4.configure(
+        scrollregion=canvas_frame4.bbox("all")
+    )
+)
+canvas_frame4.create_window((0, 0), window=scrollable_frame4, anchor="nw")
+canvas_frame4.configure(yscrollcommand=scrollbar_frame4.set)
+
+# Upakuj Canvas i pasek przewijania
+canvas_frame4.pack(side="left", fill="both", expand=True)
+scrollbar_frame4.pack(side="right", fill="y")
+
+
 window.mainloop()
-
-
-
-
-
-
-########################################
-# Others
-# def update_sliders(option_cnt, variant):
-#     comparison_data = {}
-#     slider_values = []
-#
-#     for widget in scrollable_frame.winfo_children():
-#         widget.destroy()
-#
-#     variants_count = int(option_cnt.get())
-#     sliders_count = int((variants_count * (variants_count - 1)) / 2)
-#
-#     variant_combinations = list(combinations(variant, 2))
-#
-#     for i in range(sliders_count):
-#         frame = ttk.Frame(scrollable_frame)
-#         frame.pack(side="top", fill="x", padx=5, pady=5)
-#
-#         label = ttk.Label(frame, text=f'{variant_combinations[i][0]} - {variant_combinations[i][1]}')
-#         label.pack(side="top")
-#
-#         slider = ttk.Scale(frame, from_=0, to=100, orient='horizontal', value=50, length=200)
-#         slider.pack(side="left")
-#
-#         slider_values.append(slider)
-#
-#         value_label = ttk.Label(frame, text='')
-#         value_label.pack(side="left")
-#
-#         def make_scalerSlider(slider, label):
-#             def scalerSlider(e):
-#                 label.config(text=f'{int(slider.get())}')
-#
-#             return scalerSlider
-#
-#         slider.config(command=make_scalerSlider(slider, value_label))
-#
-#     button = ttk.Button(scrollable_frame, text="Oblicz",
-#                         command=lambda: submit(variant_combinations, comparison_data, slider_values))
-#     button.pack()
-# 
-# def update_sliders(option_cnt, variant, criteria):
-#     comparison_data = {}
-#     slider_values = []
-#
-#     for widget in scrollable_frame.winfo_children():
-#         widget.destroy()
-#
-#     variants_count = int(option_cnt.get())
-#     sliders_count = int((variants_count * (variants_count - 1)) / 2)
-#
-#     variant_combinations = list(combinations(variant, 2))
-#
-#     for criterion in criteria:
-#         ttk.Label(scrollable_frame, text=f'Kryterium: {criterion}').pack()
-#
-#         for i in range(sliders_count):
-#             frame = ttk.Frame(scrollable_frame)
-#             frame.pack(side="top", fill="x", padx=5, pady=5)
-#
-#             label = ttk.Label(frame, text=f'{variant_combinations[i][0]} - {variant_combinations[i][1]}')
-#             label.pack(side="top")
-#
-#             slider = ttk.Scale(frame, from_=0, to=100, orient='horizontal', value=50, length=200)
-#             slider.pack(side="left")
-#
-#             slider_values.append(slider)
-#
-#             value_label = ttk.Label(frame, text='')
-#             value_label.pack(side="left")
-#
-#             def make_scalerSlider(slider, label):
-#                 def scalerSlider(e):
-#                     label.config(text=f'{int(slider.get())}')
-#
-#                 return scalerSlider
-#
-#             slider.config(command=make_scalerSlider(slider, value_label))
-#
-#     button = ttk.Button(scrollable_frame, text="Oblicz",
-#                         command=lambda: submit(variant_combinations, comparison_data, slider_values, len(criteria)))
-#     button.pack()
-# 
-# def submit(variant_combinations, comparison_data, slider_values):
-#     # Czyść zawartość karty "Results"
-#     global frame3
-#
-#     for widget in frame3.winfo_children():
-#         widget.destroy()
-#
-#     variants_count = len(variant_combinations)
-#     matrix = [[1] * variants_count for _ in range(variants_count)]
-#     idx1 = 0
-#     idx2 = 0
-#     builderVar = variants_count - 1
-#     matrixLvl = builderVar - 1
-#
-#     for i, slider in enumerate(slider_values):
-#         value = slider.get()
-#         if value < 0:
-#             value = 1 / -value
-#         elif value == 0:
-#             value = 1
-#         value = convertValue(value)
-#         comparison_data[variant_combinations[i]] = value
-#
-#         if i == builderVar:
-#             builderVar += matrixLvl
-#             matrixLvl -= 1
-#             idx1 += 1
-#             idx2 = idx1 + 1
-#         else:
-#             idx2 += 1
-#
-#         matrix[idx1][idx2] = round(float(value), 2)
-#         matrix[idx2][idx1] = round(float(1 / value), 2)
-#
-#     ahp = ahpy.Compare(name='AHP', comparisons=comparison_data, precision=3, random_index='saaty')
-#
-#     # Utwórz trzecią kartę
-#     # frame3 = ttk.Frame(notebook)
-#     # notebook.add(frame3, text='Results')
-#
-#     # Dodaj etykiety z wynikami
-#     ttk.Label(frame3, text="Wektor wag: " + str(ahp.target_weights)).pack()
-#     ttk.Label(frame3, text="CR: " + str(ahp.consistency_ratio)).pack()
-#     ttk.Label(frame3, text="CI: " + str(ahp.consistency_index.real)).pack()
-#     ttk.Label(frame3, text="Macierz wyborów:").pack()
-#     for row in matrix:
-#         ttk.Label(frame3, text=str(row)).pack()
-#
-#     # Przełącz na kartę z wynikami
-#     notebook.select(frame3)
-# 
-# def submit(variant_combinations, comparison_data, slider_values, criteria_count):
-#     global frame3
-#
-#     for widget in frame3.winfo_children():
-#         widget.destroy()
-#
-#     variants_count = len(variant_combinations)
-#     matrix = [[1] * variants_count for _ in range(variants_count)]
-#     idx1 = 0
-#     idx2 = 0
-#     builderVar = variants_count - 1
-#     matrixLvl = builderVar - 1
-#
-#     for j in range(criteria_count):
-#         for i in range(variants_count):
-#             value = slider_values[j*variants_count + i].get()
-#             if value < 0:
-#                 value = 1 / -value
-#             elif value == 0:
-#                 value = 1
-#             value = convertValue(value)
-#             comparison_data[variant_combinations[i]] = value
-#
-#             if i == builderVar:
-#                 builderVar += matrixLvl
-#                 matrixLvl -= 1
-#                 idx1 += 1
-#                 idx2 = idx1 + 1
-#             else:
-#                 idx2 += 1
-#
-#             matrix[idx1][idx2] = round(float(value), 2)
-#             matrix[idx2][idx1] = round(float(1 / value), 2)
-#
-#         ahp = ahpy.Compare(name='AHP', comparisons=comparison_data, precision=3, random_index='saaty')
-#
-#         # Dodaj etykiety z wynikami
-#         ttk.Label(frame3, text=f"Kryterium {j+1}").pack()
-#         ttk.Label(frame3, text="Wektor wag: " + str(ahp.target_weights)).pack()
-#         ttk.Label(frame3, text="CR: " + str(ahp.consistency_ratio)).pack()
-#         ttk.Label(frame3, text="CI: " + str(ahp.consistency_index.real)).pack()
-#         ttk.Label(frame3, text="Macierz wyborów:").pack()
-#         for row in matrix:
-#             ttk.Label(frame3, text=str(row)).pack()
-#
-#     # Przełącz na kartę z wynikami
-#     notebook.select(frame3)
